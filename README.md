@@ -109,7 +109,7 @@ Each setting can go on the data source or on the dataset. A dataset setting wins
 | `endpoint` | S3-compatible endpoint (MinIO, SeaweedFS…). Default: AWS. |
 | `path_style` | Path-style S3 URLs. Default `true` when `endpoint` is set. |
 | `access_key`, `secret_key`, `session_token` | Static S3 credentials. Omit them for a public bucket. |
-| `earliest`, `latest` | Epoch seconds or ISO-8601. Buckets outside the range are skipped, which makes this the easiest way to speed things up. |
+| `earliest`, `latest` | Epoch seconds or ISO-8601. Buckets outside the range are skipped. |
 | `index` | Report this index name for every bucket. |
 | `index_pattern` | Regex over the bucket's path; group 1 is the index name. Use it for frozen archives in custom directory trees. |
 | `fields` | `auto` (default) discovers indexed fields by sampling buckets. You can also give `none`, a list such as `user,src_ip`, or `auto,extra_field`. |
@@ -162,15 +162,6 @@ FROM splunk_smartstore
 ```esql
 FROM splunk_smartstore | WHERE @timestamp >= ?_tstart AND @timestamp <= ?_tend
 ```
-
-## Performance
-
-Decoding runs at about **1 million events per second per query** for gzip journals, and about 1.4 million for zstd. On 9.5.4, each query scans the dataset's buckets sequentially on one core. Elasticsearch doesn't yet hand plugin connectors parallel splits; the plugin already implements them, so they'll activate once the framework does.
-
-To keep queries fast:
-- scope a dataset to one index (`…/volume/<index>`);
-- set `earliest`/`latest`;
-- use `LIMIT`, which stops decoding early.
 
 ## Limitations
 
