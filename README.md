@@ -166,7 +166,7 @@ FROM splunk_smartstore | WHERE @timestamp >= ?_tstart AND @timestamp <= ?_tend
 ## Limitations
 
 - Read-only; it reads the journal only. Events removed with Splunk's `| delete` still appear, and metrics indexes return nothing, because their data lives in tsidx files.
-- Tarred or zipped frozen archives aren't unpacked.
+- Frozen buckets that a custom coldToFrozenScript packed into .tar, .tar.gz or .zip files are skipped. Splunk's default frozen format (a plain bucket directory) and its compressed journals (gzip, zstd, lz4) are fully supported.
 
 ## Build from source
 
