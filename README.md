@@ -1,4 +1,4 @@
-# esql-datasource-splunk
+# elastic-esql-datasource-splunk
 
 An **ES|QL Data Federation** connector for Elasticsearch that queries **Splunk buckets where they already are**: SmartStore remote volumes and frozen archives on Amazon S3 or S3-compatible storage. There's no thawing, no re-indexing, and Splunk doesn't need to be running.
 
