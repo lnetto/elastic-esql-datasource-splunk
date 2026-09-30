@@ -166,10 +166,7 @@ FROM splunk_smartstore | WHERE @timestamp >= ?_tstart AND @timestamp <= ?_tend
 ## Limitations
 
 - Read-only; it reads the journal only. Events removed with Splunk's `| delete` still appear, and metrics indexes return nothing, because their data lives in tsidx files.
-- S3 authentication is static keys or anonymous. There's no IAM-role chain yet.
 - Tarred or zipped frozen archives aren't unpacked.
-- The Kibana Data Federation UI can't create the `splunk` data source; use the API, as shown above.
-- Dataset `mappings` aren't supported; use `timestamp_field` to choose `@timestamp`.
 
 ## Build from source
 
