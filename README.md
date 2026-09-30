@@ -1,6 +1,6 @@
 # esql-datasource-splunk
 
-An **ES|QL Data Federation** connector for Elasticsearch that queries **Splunk buckets where they already are**: SmartStore remote volumes on S3, and frozen archives on S3 or a shared filesystem. There's no thawing, no re-indexing, and Splunk doesn't need to be running.
+An **ES|QL Data Federation** connector for Elasticsearch that queries **Splunk buckets where they already are**: SmartStore remote volumes and frozen archives on Amazon S3 or S3-compatible storage. There's no thawing, no re-indexing, and Splunk doesn't need to be running.
 
 ```esql
 FROM splunk_archive
@@ -16,7 +16,7 @@ The plugin reads each bucket's `rawdata/journal` (gzip, zstd or lz4) and decodes
 
 - **Elasticsearch 9.5.4**, self-managed, Docker or Elastic Cloud Hosted. Serverless doesn't support plugins. For another version, [build from source](#build-from-source).
 - A license that includes ES|QL Data Federation (Enterprise, or a trial).
-- Read access to the buckets. That means an S3 bucket (AWS or S3-compatible) or a filesystem path that every Elasticsearch node can see.
+- Read access to the S3 bucket holding the Splunk buckets (AWS or S3-compatible), reachable from every Elasticsearch node.
 
 ## Install
 
@@ -34,8 +34,6 @@ Then add to `elasticsearch.yml`:
 
 ```yaml
 esql.federation.enabled: true
-# only for buckets on a filesystem (splunkfs://): the bucket root must be under path.repo
-path.repo: ["/mnt/splunk-frozen"]
 ```
 
 Restart the nodes. In `kibana.yml`, set `xpack.dataFederation.enabled: true` to turn on Kibana's Data Federation pages.
@@ -61,7 +59,7 @@ Your Cloud organization's subscription must allow custom plugins.
    - Kibana → *User settings*: `xpack.dataFederation.enabled: true`.
 3. Save. This applies as a rolling restart, which takes a few minutes.
 
-On Cloud, use `splunks3://`; there's no shared filesystem. Keep the S3 bucket in the deployment's region.
+Keep the S3 bucket in the deployment's region.
 
 ## Connect your buckets
 
@@ -86,10 +84,6 @@ PUT /_query/dataset/splunk_frozen
 { "data_source": "splunk",
   "resource": "splunks3://my-archive-bucket/frozen",
   "settings": { "access_key": "…", "secret_key": "…" } }
-
-# Frozen archive on a filesystem mounted at the same path on every node (under path.repo)
-PUT /_query/dataset/splunk_nfs
-{ "data_source": "splunk", "resource": "splunkfs:///mnt/splunk-frozen" }
 ```
 
 Now query them:
@@ -124,7 +118,7 @@ Each setting can go on the data source or on the dataset. A dataset setting wins
 
 ### Where the buckets can live
 
-Discovery walks everything under the dataset's path, at any depth. Any directory that contains `rawdata/journal*`, SmartStore journal slices, or a loose `journal.gz`/`.zst`/`.lz4` counts as a bucket.
+Discovery walks everything under the dataset's S3 prefix, at any depth. Any directory that contains `rawdata/journal*`, SmartStore journal slices, or a loose `journal.gz`/`.zst`/`.lz4` counts as a bucket.
 
 - **SmartStore:** the index name comes from the directory before `db/`. Duplicate uploads are resolved with `receipt.json`.
 - **Frozen buckets:** buckets named `db_<newest>_<oldest>_<id>` also give each bucket's time range, so `earliest`/`latest` can skip whole buckets.
