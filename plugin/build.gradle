@@ -1,0 +1,56 @@
+/*
+ * Splunk bucket connector for ES|QL Data Federation — out-of-tree build.
+ *
+ * ES|QL's datasource SPI isn't published to Maven, so we compile against the jars shipped in
+ * the matching Elasticsearch image (scripts/extract-es-jars.sh → es-libs/). Nothing from
+ * es-libs is bundled: x-pack-esql and esql-datasource-compression-libs (aircompressor) are
+ * provided at runtime through extended.plugins.
+ */
+plugins {
+    id 'java'
+}
+
+group = 'org.elasticsearch.xpack.esql.datasource.splunk'
+version = "${pluginVersion}"
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+repositories {
+    mavenCentral()
+}
+
+def esLibs = fileTree(dir: 'es-libs', include: [
+    'lib/*.jar',
+    'modules/x-pack-core/*.jar',
+    'modules/x-pack-esql/*.jar',
+    'modules/x-pack-esql-core/*.jar',
+    'modules/esql-datasource-compression-libs/*.jar',
+])
+
+dependencies {
+    compileOnly esLibs
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.compilerArgs << '-Xlint:all,-processing,-serial,-try,-classfile' << '-Werror'
+}
+
+def descriptor = tasks.register('pluginDescriptor', Copy) {
+    from 'src/main/plugin-metadata'
+    into layout.buildDirectory.dir('plugin-metadata')
+    // declared so a version bump re-expands the descriptor instead of reusing a cached one
+    inputs.property('pluginVersion', project.version)
+    inputs.property('esVersion', esVersion)
+    expand(pluginVersion: project.version, esVersion: esVersion)
+}
+
+tasks.register('bundlePlugin', Zip) {
+    dependsOn jar, descriptor
+    archiveFileName = "esql-datasource-splunk-${project.version}-es${esVersion}.zip"
+    destinationDirectory = layout.buildDirectory.dir('distributions')
+    from jar
+    from descriptor
+}
