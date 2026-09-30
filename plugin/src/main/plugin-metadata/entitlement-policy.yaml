@@ -1,0 +1,9 @@
+ALL-UNNAMED:
+  # splunks3:// — JDK HttpClient to S3 / MinIO
+  - outbound_network
+  - manage_threads
+  # splunkfs:// — bucket trees must live under a path.repo directory
+  - files:
+      - relative_path: .
+        relative_to: shared_repo
+        mode: read
