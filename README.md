@@ -179,6 +179,16 @@ ES_VERSION=9.5.5 ./build-plugin.sh      # another version
 
 A plugin zip installs only on the exact Elasticsearch version it was built for. Upgrading Elasticsearch means rebuilding the plugin, and on Cloud, uploading it as a new extension.
 
+## Interoperability and your data
+
+This plugin exists so you can read **your own data** with another tool. Splunk buckets on your S3 storage hold events you ingested, and you own that content.
+
+- The plugin contains no Splunk code, binaries or libraries, and doesn't need Splunk software to be installed or running.
+- It only reads bucket files from storage you point it at, using credentials you supply. It never connects to a Splunk instance or service.
+- Whether your agreement with Splunk affects how you use your bucket files is for you to check against your own terms.
+
 ## License
 
 [Apache 2.0](LICENSE)
+
+Splunk is a trademark or registered trademark of Splunk LLC (a Cisco company) in the United States and other countries. Elasticsearch, Elastic and ES|QL are trademarks of Elasticsearch B.V. This project is not affiliated with, endorsed by, or sponsored by Splunk, Cisco or Elastic.
