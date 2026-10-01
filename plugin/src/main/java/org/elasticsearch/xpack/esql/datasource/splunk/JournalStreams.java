@@ -13,7 +13,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.List;
-import java.util.zip.GZIPInputStream;
+import java.util.zip.CRC32;
+import java.util.zip.DataFormatException;
+import java.util.zip.Inflater;
+import java.util.zip.ZipException;
 
 /**
  * Turns the stored bytes of a bucket's journal into the decompressed journal stream.
@@ -58,7 +61,7 @@ final class JournalStreams {
 
     static InputStream decompress(BufferedInputStream in) throws IOException {
         return switch (sniff(in)) {
-            case GZIP -> new GZIPInputStream(in, 64 * 1024);   // handles concatenated members
+            case GZIP -> new GzipMembersInputStream(in);         // handles concatenated members
             case ZSTD -> new ZstdInputStream(in);                // handles concatenated frames
             case LZ4 -> new Lz4FrameInputStream(in);
             case NONE -> in;
@@ -135,6 +138,185 @@ final class JournalStreams {
             if (current != null) {
                 current.close();
             }
+        }
+    }
+
+    /**
+     * Multi-member gzip reader. Splunk writes {@code journal.gz} as many small members (~14 KB
+     * each), so a 3 GB journal has hundreds of thousands of member boundaries.
+     *
+     * <p>{@link java.util.zip.GZIPInputStream} only continues past a member when
+     * {@code in.available() > 0} (or more than 26 bytes are left in its inflater). A network
+     * stream routinely reports 0 at the boundary, and GZIPInputStream then returns a clean EOF:
+     * the journal is silently cut short at a random member. This reader decides from the bytes
+     * alone: after a member it reads ahead, and only a true end of input ends the stream.
+     * A truncated member throws instead of ending quietly.
+     */
+    static final class GzipMembersInputStream extends InputStream {
+        private static final int FHCRC = 2, FEXTRA = 4, FNAME = 8, FCOMMENT = 16;
+
+        private final InputStream in;
+        private final Inflater inflater = new Inflater(true);
+        private final CRC32 crc = new CRC32();
+        private final byte[] input = new byte[64 * 1024];
+        private int inputPos;
+        private int inputLen;
+        private boolean eof;
+
+        GzipMembersInputStream(InputStream in) throws IOException {
+            this.in = in;
+            if (readHeader(true) == false) {
+                throw new EOFException("empty gzip stream");
+            }
+        }
+
+        @Override
+        public int read() throws IOException {
+            byte[] one = new byte[1];
+            int n = read(one, 0, 1);
+            return n < 0 ? -1 : one[0] & 0xFF;
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            if (len == 0) {
+                return 0;
+            }
+            while (eof == false) {
+                int n;
+                try {
+                    n = inflater.inflate(b, off, len);
+                } catch (DataFormatException e) {
+                    throw new ZipException("invalid gzip data: " + e.getMessage());
+                }
+                if (n > 0) {
+                    crc.update(b, off, n);
+                    return n;
+                }
+                if (inflater.finished()) {
+                    inputPos = inputLen - inflater.getRemaining();
+                    readTrailer();
+                    if (readHeader(false) == false) {
+                        eof = true;
+                    }
+                } else if (inflater.needsInput()) {
+                    if (fill() == false) {
+                        throw new EOFException("truncated gzip member");
+                    }
+                    inflater.setInput(input, inputPos, inputLen - inputPos);
+                } else if (inflater.needsDictionary()) {
+                    throw new ZipException("gzip member needs a preset dictionary");
+                }
+            }
+            return -1;
+        }
+
+        /** Next member's header; false on a clean end of input (or trailing non-gzip bytes, which gzip(1) also ignores). */
+        private boolean readHeader(boolean first) throws IOException {
+            int b0 = nextByte();
+            if (b0 < 0) {
+                return false;
+            }
+            int b1 = nextByte();
+            if (b0 != 0x1F || b1 != 0x8B) {
+                if (first) {
+                    throw new ZipException("not in gzip format");
+                }
+                return false;
+            }
+            CRC32 headerCrc = new CRC32();
+            headerCrc.update(b0);
+            headerCrc.update(b1);
+            int cm = requireByte(headerCrc);
+            if (cm != 8) {
+                throw new ZipException("unsupported gzip compression method " + cm);
+            }
+            int flg = requireByte(headerCrc);
+            for (int i = 0; i < 6; i++) {                   // MTIME, XFL, OS
+                requireByte(headerCrc);
+            }
+            if ((flg & FEXTRA) != 0) {
+                int xlen = requireByte(headerCrc) | requireByte(headerCrc) << 8;
+                for (int i = 0; i < xlen; i++) {
+                    requireByte(headerCrc);
+                }
+            }
+            if ((flg & FNAME) != 0) {
+                while (requireByte(headerCrc) != 0) {
+                }
+            }
+            if ((flg & FCOMMENT) != 0) {
+                while (requireByte(headerCrc) != 0) {
+                }
+            }
+            if ((flg & FHCRC) != 0) {
+                int expected = requireByte(null) | requireByte(null) << 8;
+                if (expected != ((int) headerCrc.getValue() & 0xFFFF)) {
+                    throw new ZipException("corrupt gzip header");
+                }
+            }
+            inflater.reset();
+            crc.reset();
+            inflater.setInput(input, inputPos, inputLen - inputPos);
+            return true;
+        }
+
+        private void readTrailer() throws IOException {
+            long expectedCrc = readUInt();
+            long expectedSize = readUInt();
+            if (expectedCrc != crc.getValue()) {
+                throw new ZipException("corrupt gzip member (CRC mismatch)");
+            }
+            if (expectedSize != (inflater.getBytesWritten() & 0xFFFFFFFFL)) {
+                throw new ZipException("corrupt gzip member (size mismatch)");
+            }
+        }
+
+        private long readUInt() throws IOException {
+            long v = 0;
+            for (int i = 0; i < 4; i++) {
+                v |= (long) requireByte(null) << (8 * i);
+            }
+            return v;
+        }
+
+        private int requireByte(CRC32 headerCrc) throws IOException {
+            int b = nextByte();
+            if (b < 0) {
+                throw new EOFException("truncated gzip member");
+            }
+            if (headerCrc != null) {
+                headerCrc.update(b);
+            }
+            return b;
+        }
+
+        private int nextByte() throws IOException {
+            if (inputPos == inputLen && fill() == false) {
+                return -1;
+            }
+            return input[inputPos++] & 0xFF;
+        }
+
+        /** Refills the input buffer once it is fully consumed; false only at end of input. */
+        private boolean fill() throws IOException {
+            int n = in.read(input, 0, input.length);
+            while (n == 0) {
+                n = in.read(input, 0, input.length);
+            }
+            if (n < 0) {
+                inputPos = inputLen = 0;
+                return false;
+            }
+            inputPos = 0;
+            inputLen = n;
+            return true;
+        }
+
+        @Override
+        public void close() throws IOException {
+            inflater.end();
+            in.close();
         }
     }
 

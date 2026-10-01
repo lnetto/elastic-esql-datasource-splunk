@@ -20,14 +20,14 @@ The plugin reads each bucket's `rawdata/journal` (gzip, zstd or lz4) and decodes
 
 ## Install
 
-The ready-to-install plugin is in [`dist/`](dist/): `esql-datasource-splunk-0.2.3-es9.5.4.zip`.
+The ready-to-install plugin is in [`dist/`](dist/): `esql-datasource-splunk-0.2.4-es9.5.4.zip`.
 
 ### Self-managed
 
 On **every** node:
 
 ```bash
-bin/elasticsearch-plugin install file:///path/to/esql-datasource-splunk-0.2.3-es9.5.4.zip
+bin/elasticsearch-plugin install file:///path/to/esql-datasource-splunk-0.2.4-es9.5.4.zip
 ```
 
 Then add to `elasticsearch.yml`:
