@@ -1,0 +1,10 @@
+elastic-esql-datasource-splunk
+
+This product includes software derived from splunker
+(https://github.com/fionera/splunker), by Fionera and Tim Windelschmidt,
+licensed under the Apache License, Version 2.0.
+
+The Splunk journal decoder (JournalDecoder.java) is a Java port of
+splunker's journal decoding logic, modified for streaming reads,
+fail-fast handling of corrupt input, and use as an
+ES|QL data source.

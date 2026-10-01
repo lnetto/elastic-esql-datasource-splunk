@@ -187,6 +187,10 @@ This plugin exists so you can read **your own data** with another tool. Splunk b
 - It only reads bucket files from storage you point it at, using credentials you supply. It never connects to a Splunk instance or service.
 - Whether your agreement with Splunk affects how you use your bucket files is for you to check against your own terms.
 
+The journal format has been publicly documented in open source since 2023. This plugin's decoder is derived from [fionera/splunker](https://github.com/fionera/splunker) (Go, Apache 2.0); see [NOTICE](NOTICE).
+
+See also [ponquersohn/splunk_ddss_extractor](https://github.com/ponquersohn/splunk_ddss_extractor), an independent Python/Rust extractor also based on splunker.
+
 ## License
 
 [Apache 2.0](LICENSE)

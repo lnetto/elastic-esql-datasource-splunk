@@ -17,8 +17,8 @@ import java.util.List;
  * Streaming decoder for the (decompressed) {@code rawdata/journal} data format, so that
  * customer-owned bucket data can be read by Elasticsearch without Splunk software.
  *
- * <p>Port of the Python decoder in splunk-journal-extractor
- * ({@code decoder.py}), with three deliberate differences:
+ * <p>Derived from splunker (https://github.com/fionera/splunker, Apache License 2.0,
+ * by Fionera and Tim Windelschmidt). Ported to Java and modified for this plugin:
  * <ul>
  *   <li>Streaming: bounded read-ahead buffer, never the whole journal in memory.</li>
  *   <li>Fail fast: an unknown opcode, an over-long varint, or an event whose declared
