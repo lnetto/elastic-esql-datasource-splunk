@@ -1,4 +1,4 @@
-# esql-datasource-splunk
+# elastic-esql-datasource-splunk
 
 An **ES|QL Data Federation** connector for Elasticsearch that queries **Splunk buckets where they already are**: SmartStore remote volumes and frozen archives on Amazon S3 or S3-compatible storage. There's no thawing, no re-indexing, and Splunk doesn't need to be running.
 
@@ -166,7 +166,7 @@ FROM splunk_smartstore | WHERE @timestamp >= ?_tstart AND @timestamp <= ?_tend
 ## Limitations
 
 - Read-only; it reads the journal only. Events removed with Splunk's `| delete` still appear, and metrics indexes return nothing, because their data lives in tsidx files.
-- Tarred or zipped frozen archives aren't unpacked.
+- Frozen buckets that a custom coldToFrozenScript packed into .tar, .tar.gz or .zip files are skipped. Splunk's default frozen format (a plain bucket directory) and its compressed journals (gzip, zstd, lz4) are fully supported.
 
 ## Build from source
 
