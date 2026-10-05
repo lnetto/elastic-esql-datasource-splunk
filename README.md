@@ -1,6 +1,6 @@
 # elastic-esql-datasource-splunk
 
-An **ES|QL Data Federation** connector for Elasticsearch that queries **Splunk buckets where they already are**: SmartStore remote volumes and frozen archives on Amazon S3 or S3-compatible storage. There's no thawing, no re-indexing, and Splunk doesn't need to be running.
+An **ES|QL Data Federation** connector for Elasticsearch that queries **Splunk buckets where they already are**: SmartStore remote volumes and frozen archives on Amazon S3, S3-compatible storage, or a shared filesystem such as NFS. There's no thawing, no re-indexing, and Splunk doesn't need to be running.
 
 ```esql
 FROM splunk_archive
@@ -16,7 +16,9 @@ The plugin reads each bucket's `rawdata/journal` (gzip, zstd or lz4) and decodes
 
 - **Elasticsearch 9.5.4**, self-managed, Docker or Elastic Cloud Hosted. Serverless doesn't support plugins. For another version, [build from source](#build-from-source).
 - A license that includes ES|QL Data Federation (Enterprise, or a trial).
-- Read access to the S3 bucket holding the Splunk buckets (AWS or S3-compatible), reachable from every Elasticsearch node.
+- Read access to the Splunk buckets from every Elasticsearch node, either:
+  - in an S3 bucket (AWS or S3-compatible), or
+  - on a filesystem mounted on every node under `path.repo`, such as an NFS share. This option is for self-managed and Docker only; see [Buckets on a shared filesystem](#buckets-on-a-shared-filesystem-nfs).
 
 ## Install
 
@@ -59,7 +61,7 @@ Your Cloud organization's subscription must allow custom plugins.
    - Kibana → *User settings*: `xpack.dataFederation.enabled: true`.
 3. Save. This applies as a rolling restart, which takes a few minutes.
 
-Keep the S3 bucket in the deployment's region.
+Keep the S3 bucket in the deployment's region. Elastic Cloud Hosted can't mount NFS or other filesystems on its nodes, so use `splunks3://` there.
 
 ## Connect your buckets
 
@@ -84,6 +86,11 @@ PUT /_query/dataset/splunk_frozen
 { "data_source": "splunk",
   "resource": "splunks3://my-archive-bucket/frozen",
   "settings": { "access_key": "…", "secret_key": "…" } }
+
+# Frozen archive on a shared filesystem (NFS), self-managed or Docker only
+PUT /_query/dataset/splunk_frozen_nfs
+{ "data_source": "splunk",
+  "resource": "splunkfs:///mnt/splunk-frozen" }
 ```
 
 Now query them:
@@ -96,6 +103,36 @@ POST /_query?format=txt
 Or open **Discover** in ES|QL mode and run `FROM splunk_smartstore | LIMIT 100`.
 
 **Credentials:** put S3 credentials on the **dataset**, not the data source, because on 9.5.4 connectors receive data-source secrets still encrypted. Use a read-only IAM user scoped to the bucket: `GET /_query/dataset/<name>` shows the keys to anyone allowed to call it.
+
+### Buckets on a shared filesystem (NFS)
+
+`splunkfs:///<absolute path>` reads bucket trees from a directory on the Elasticsearch nodes. Use it for a `coldToFrozenDir` archive on NFS, or for a SmartStore tree copied down from S3. The plugin has no NFS client of its own: it reads ordinary files, so the share has to be mounted by the operating system.
+
+- **Mount it on every node at the same path.** Discovery runs on the node that plans the query, and the buckets are then read on the data nodes. A node without the mount fails the query. A read-only mount is enough.
+- **Put it under `path.repo`.** Elasticsearch only lets plugins read files below the directories listed in `path.repo`. Add the mount point, or a parent of it, to `elasticsearch.yml` on every node and restart:
+
+  ```yaml
+  path.repo: ["/mnt/splunk-frozen"]
+  ```
+
+  On Docker, bind-mount the share and set the same setting:
+
+  ```bash
+  docker run -v /mnt/splunk-frozen:/mnt/splunk-frozen:ro \
+    -e path.repo=/mnt/splunk-frozen -e esql.federation.enabled=true \
+    elasticsearch-esql-splunk:9.5.4
+  ```
+
+- **Make it readable by the `elasticsearch` user** (UID 1000 in the Docker image). Splunk's frozen files are usually owned by the `splunk` user, so check the NFS export's permissions or squash settings.
+- **Not on Elastic Cloud Hosted**: you can't mount filesystems on Cloud nodes or change their `path.repo`. Use `splunks3://` there.
+
+Typical errors:
+
+- `Failed to list Splunk buckets at [splunkfs:///…]: bucket root […] is not a directory`: the path isn't mounted, or is mistyped, on the node that planned the query.
+- `Failed to list Splunk buckets at [splunkfs:///…]: …` with a permission or entitlement message: the directory isn't readable by `elasticsearch`, or isn't under `path.repo`.
+- `No Splunk buckets (rawdata/journal*) found at [splunkfs:///…]`: the directory is readable but no bucket under it has a journal.
+
+The S3 settings (`region`, `endpoint`, `access_key` and so on) don't apply to `splunkfs://`; every other setting does.
 
 **Adding datasets in Kibana's UI:** you can add datasets there once the data source exists. Set **format** to **auto** or leave it empty. An explicit file format such as `parquet` or `csv` can route the dataset to Elasticsearch's built-in file reader instead.
 
@@ -118,7 +155,7 @@ Each setting can go on the data source or on the dataset. A dataset setting wins
 
 ### Where the buckets can live
 
-Discovery walks everything under the dataset's S3 prefix, at any depth. Any directory that contains `rawdata/journal*`, SmartStore journal slices, or a loose `journal.gz`/`.zst`/`.lz4` counts as a bucket.
+Discovery walks everything under the dataset's S3 prefix or `splunkfs` directory. Any directory that contains `rawdata/journal*`, SmartStore journal slices, or a loose `journal.gz`/`.zst`/`.lz4` counts as a bucket.
 
 - **SmartStore:** the index name comes from the directory before `db/`. Duplicate uploads are resolved with `receipt.json`.
 - **Frozen buckets:** buckets named `db_<newest>_<oldest>_<id>` also give each bucket's time range, so `earliest`/`latest` can skip whole buckets.
