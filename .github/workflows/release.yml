@@ -59,6 +59,7 @@ jobs:
     if: ${{ !cancelled() && needs.plan.outputs.versions != '[]' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: zips
@@ -71,8 +72,8 @@ jobs:
           shopt -s nullglob
           zips=(zips/*.zip)
           [ ${#zips[@]} -gt 0 ] || { echo "nothing built"; exit 1; }
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes \
-              "Download the zip whose \`-esX.Y.Z\` suffix matches your Elasticsearch version exactly; a plugin zip installs only on the version it was built for. Zips for new Elasticsearch releases are added here automatically. See the [README](https://github.com/${GH_REPO}#install) to install."
-          fi
+          gh release view "$TAG" >/dev/null 2>&1 \
+            || gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes ""
           gh release upload "$TAG" "${zips[@]}"
+          # refresh the supported-versions table
+          gh release edit "$TAG" --notes "$(scripts/release-notes.sh "$TAG")"
