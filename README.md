@@ -14,7 +14,7 @@ The plugin reads each bucket's `rawdata/journal` (gzip, zstd or lz4) and decodes
 
 ## Requirements
 
-- **Elasticsearch 9.5.4**, self-managed, Docker or Elastic Cloud Hosted. Serverless doesn't support plugins. For another version, [build from source](#build-from-source).
+- **Elasticsearch 9.5.4 or later**, self-managed, Docker or Elastic Cloud Hosted. Serverless doesn't support plugins. For a version without a release zip, [build from source](#build-from-source).
 - A license that includes ES|QL Data Federation (Enterprise, or a trial).
 - Read access to the Splunk buckets from every Elasticsearch node, either:
   - in an S3 bucket (AWS or S3-compatible), or
@@ -22,7 +22,7 @@ The plugin reads each bucket's `rawdata/journal` (gzip, zstd or lz4) and decodes
 
 ## Install
 
-The ready-to-install plugin is in [`dist/`](dist/): `esql-datasource-splunk-0.2.4-es9.5.4.zip`.
+Download the plugin from [Releases](../../releases/latest). Each release has one zip per Elasticsearch version, such as `esql-datasource-splunk-0.2.4-es9.5.4.zip`; pick the one that matches your version exactly. Zips for new Elasticsearch releases are added automatically within a day.
 
 ### Self-managed
 
@@ -214,7 +214,11 @@ You only need Docker. The script pulls the matching Elasticsearch image to compi
 ES_VERSION=9.5.5 ./build-plugin.sh      # another version
 ```
 
-A plugin zip installs only on the exact Elasticsearch version it was built for. Upgrading Elasticsearch means rebuilding the plugin, and on Cloud, uploading it as a new extension.
+A plugin zip installs only on the exact Elasticsearch version it was built for. Upgrading Elasticsearch means installing the matching zip (or rebuilding), and on Cloud, uploading it as a new extension.
+
+### Releases
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) runs daily and on pushes to `main`. It builds every Elasticsearch release from `minEsVersion` (in `plugin/gradle.properties`) onward that the `v<pluginVersion>` release has no zip for yet, and uploads the zips. To ship a code change, bump `pluginVersion`: the next run creates the new release and builds it for every supported version.
 
 ## Interoperability and your data
 

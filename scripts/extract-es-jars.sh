@@ -10,4 +10,6 @@ docker run --rm --entrypoint tar "docker.elastic.co/elasticsearch/elasticsearch:
   -C /usr/share/elasticsearch -cf - lib \
   modules/x-pack-core modules/x-pack-esql modules/x-pack-esql-core modules/esql-datasource-compression-libs \
   | tar -xf - -C "$OUT"
+# the image ships them read-only; keep them deletable so switching ES_VERSION can clear them
+chmod -R u+w "$OUT"
 echo "extracted ES ${ES_VERSION} jars into $OUT ($(find "$OUT" -name '*.jar' | wc -l) jars)"
