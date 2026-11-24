@@ -22,14 +22,14 @@ The plugin reads each bucket's `rawdata/journal` (gzip, zstd or lz4) and decodes
 
 ## Install
 
-Download the plugin from [Releases](../../releases/latest). Each release has one zip per Elasticsearch version, such as `esql-datasource-splunk-0.2.4-es9.5.4.zip`; pick the one that matches your version exactly. Zips for new Elasticsearch releases are added automatically within a day.
+Download the plugin from [Releases](../../releases/latest). Each release has one zip per Elasticsearch version, such as `esql-datasource-splunk-0.2.5-es9.5.4.zip`; pick the one that matches your version exactly. Zips for new Elasticsearch releases are added automatically within a day.
 
 ### Self-managed
 
 On **every** node:
 
 ```bash
-bin/elasticsearch-plugin install file:///path/to/esql-datasource-splunk-0.2.4-es9.5.4.zip
+bin/elasticsearch-plugin install file:///path/to/esql-datasource-splunk-0.2.5-es9.5.4.zip
 ```
 
 Then add to `elasticsearch.yml`:
