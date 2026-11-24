@@ -75,7 +75,7 @@ public final class SplunkStorageProvider implements StorageProvider {
         return SplunkConfig.FS_SCHEME.equals(scheme) || SplunkConfig.S3_SCHEME.equals(scheme);
     }
 
-    private record BucketTreeObject(StoragePath path, long knownLength, Instant knownLastModified) implements StorageObject {
+    private record BucketTreeObject(StoragePath path, long knownLength, Instant knownLastModified) implements CompatStorageObject {
 
         @Override
         public InputStream newStream() throws IOException {

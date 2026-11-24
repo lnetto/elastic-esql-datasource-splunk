@@ -21,6 +21,19 @@ repositories {
     mavenCentral()
 }
 
+// The datasource SPI changes between patch releases; src/compat/es-<first version>/ holds the
+// code that differs. Each shim set is named after the first Elasticsearch release it targets.
+def esVersionAtLeast = { String min ->
+    def a = esVersion.tokenize('.').collect { it as int }
+    def b = min.tokenize('.').collect { it as int }
+    for (int i = 0; i < Math.max(a.size(), b.size()); i++) {
+        int x = i < a.size() ? a[i] : 0, y = i < b.size() ? b[i] : 0
+        if (x != y) return x > y
+    }
+    return true
+}
+sourceSets.main.java.srcDir(esVersionAtLeast('9.5.7') ? 'src/compat/es-9.5.7/java' : 'src/compat/es-pre-9.5.7/java')
+
 def esLibs = fileTree(dir: 'es-libs', include: [
     'lib/*.jar',
     'modules/x-pack-core/*.jar',
